@@ -1,0 +1,318 @@
+/* CSS Variables for Theming */
+:root {
+    /* Light Mode (Warm White) */
+    --bg-app: #F9F9F9;
+    --bg-header: #F1F1EF;
+    /* A bit warmer/greyer like Notion top bar */
+    --text-primary: #333333;
+    --text-secondary: #9B9A97;
+    --border-color: #E6E6E6;
+    --hover-bg: rgba(0, 0, 0, 0.05);
+
+    --highlight-bg: #FDECC8;
+    /* Soft Yellow */
+    --selection-bg: #D9EFF8;
+
+    --shadow-panel: 0px 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] {
+    /* Dark Mode (Deep Charcoal) */
+    --bg-app: #1E1E1E;
+    --bg-header: #2F3437;
+    /* Sidebar grey */
+    --text-primary: #E0E0E0;
+    --text-secondary: #AAAAAA;
+    --border-color: #3F4447;
+    --hover-bg: rgba(255, 255, 255, 0.055);
+
+    --highlight-bg: rgba(255, 255, 0, 0.3);
+    /* Vibrant Translucent Yellow */
+    --selection-bg: #2D4656;
+
+    --shadow-panel: 0px 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--text-primary);
+    background-color: #f0f0f0;
+    /* Browser outside simulation */
+    height: 100vh;
+    overflow: hidden;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+/* Background Simulation */
+.browser-bg {
+    padding: 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    max-width: 800px;
+}
+
+/* Side Panel Container */
+.side-note-panel {
+    position: fixed;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 25vw;
+    min-width: 320px;
+    height: 75vh;
+    background-color: var(--bg-app);
+    border-radius: 12px;
+    box-shadow: var(--shadow-panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    border: 1px solid var(--border-color);
+}
+
+/* Light Mode Paper Effect (Yellowing/Curled Corner) */
+.side-note-panel::after {
+    content: '';
+    position: absolute;
+    bottom: 0px;
+    right: 0px;
+    width: 150px;
+    height: 150px;
+    /* Subtle radial gradient mimicking aged paper/coffee stain spread from corner */
+    background: radial-gradient(circle at bottom right, #EFDECD 0%, rgba(240, 230, 210, 0.3) 40%, transparent 70%);
+    pointer-events: none;
+    border-bottom-right-radius: 11px;
+    /* Match container minus border */
+    opacity: 0.8;
+    mix-blend-mode: multiply;
+}
+
+/* Hide paper effect in Dark Mode */
+[data-theme="dark"] .side-note-panel::after {
+    display: none;
+}
+
+/* Header */
+.header {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background-color: var(--bg-header);
+    /* Slight contrast header */
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.actions {
+    display: flex;
+    gap: 4px;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+}
+
+.icon-btn:hover {
+    background-color: var(--hover-bg);
+    color: var(--text-primary);
+}
+
+/* Metadata */
+.metadata {
+    padding: 12px 24px 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid transparent;
+    /* Placeholder for visual separation */
+}
+
+.meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.meta-value {
+    outline: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s, background-color 0.2s;
+    padding: 2px 4px;
+    border-radius: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 50px;
+}
+
+.meta-value:hover {
+    background-color: var(--hover-bg);
+}
+
+.meta-value:focus {
+    background-color: var(--hover-bg);
+    border-bottom: 1px solid var(--text-secondary);
+    color: var(--text-primary);
+}
+
+/* Editor */
+.editor {
+    flex: 1;
+    padding: 8px 24px 24px 24px;
+    overflow-y: auto;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    outline: none;
+}
+
+/* Editor Typography Styling */
+.editor h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 16px 0 8px 0;
+}
+
+.editor h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 14px 0 6px 0;
+}
+
+.editor p {
+    margin: 0 0 8px 0;
+}
+
+.editor ul,
+.editor ol {
+    padding-left: 20px;
+    margin: 0 0 8px 0;
+}
+
+.editor blockquote {
+    border-left: 3px solid var(--text-primary);
+    padding-left: 14px;
+    margin: 8px 0;
+    font-style: italic;
+    color: var(--text-primary);
+    opacity: 0.8;
+}
+
+/* Formatting Classes */
+.highlight {
+    background-color: var(--highlight-bg);
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+/* Scrollbar styling */
+.editor::-webkit-scrollbar {
+    width: 6px;
+}
+
+.editor::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.editor::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+[data-theme="dark"] .editor::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Toast */
+.toast {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.toast.visible {
+    opacity: 1;
+}
+
+/* Toast Variants */
+.toast.success {
+    background-color: rgba(230, 244, 234, 0.85);
+    /* Translucent Pale Green */
+    color: #1E4620;
+    border: 1px solid rgba(206, 234, 214, 0.5);
+}
+
+[data-theme="dark"] .toast.success {
+    background-color: rgba(30, 40, 32, 0.85);
+    /* Translucent Dark Green */
+    color: #A6D6A8;
+    border: 1px solid rgba(45, 61, 47, 0.5);
+}
+
+.toast.error {
+    background-color: rgba(252, 232, 230, 0.85);
+    /* Translucent Pale Red */
+    color: #8C1D18;
+    border: 1px solid rgba(250, 210, 207, 0.5);
+}
+
+[data-theme="dark"] .toast.error {
+    background-color: rgba(44, 26, 26, 0.85);
+    /* Translucent Dark Red */
+    color: #F2B7B5;
+    border: 1px solid rgba(66, 31, 31, 0.5);
+}
+
+/* Resize Handle */
+.resize-handle {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    cursor: col-resize;
+    transition: background 0.2s;
+}
+
+.resize-handle:hover {
+    background-color: var(--selection-bg);
+}

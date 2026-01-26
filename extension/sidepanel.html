@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Side Note</title>
+    <link rel="stylesheet" href="sidepanel.css">
+  </head>
+  <body>
+    <div class="panel" id="sidePanel">
+      <header class="header">
+        <div class="logo-area">
+          <span class="logo-icon" aria-hidden="true">📝</span>
+          <span class="app-name">Side Note</span>
+        </div>
+        <div class="actions">
+          <button class="icon-btn" id="themeToggle" title="切换主题" aria-label="切换主题">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="sun-icon">
+              <path
+                d="M12 3V4M12 20V21M4 12H3M21 12H20M5.636 5.636L6.343 6.343M17.657 17.657L18.364 18.364M5.636 18.364L6.343 17.657M17.657 6.343L18.364 5.636M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              />
+            </svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="moon-icon">
+              <path
+                d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <button class="icon-btn" id="copyBtn" title="复制" aria-label="复制全部内容">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round"
+              />
+              <path
+                d="M5 15H4C2.89543 15 2 14.1046 2 13V4C2 2.89543 2.89543 2 4 2H13C14.1046 2 15 2.89543 15 4V5"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <button class="icon-btn" id="closeBtn" title="关闭" aria-label="关闭面板">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M18 6L6 18M6 6L18 18"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="metadata">
+        <label class="meta-row">
+          <span class="meta-label" title="URL" aria-hidden="true">🔗</span>
+          <input class="meta-input" id="metaUrl" type="text" spellcheck="false" aria-label="网页链接">
+        </label>
+        <label class="meta-row">
+          <span class="meta-label" title="标题" aria-hidden="true">📑</span>
+          <input class="meta-input" id="metaTitle" type="text" spellcheck="false" aria-label="网页标题">
+        </label>
+        <label class="meta-row">
+          <span class="meta-label" title="创建时间" aria-hidden="true">📅</span>
+          <input class="meta-input" id="metaCreated" type="text" spellcheck="false" aria-label="创建时间">
+        </label>
+      </section>
+
+      <section class="editor">
+        <div class="editor-surface" id="editor" aria-label="笔记内容"></div>
+      </section>
+
+      <div id="toast" class="toast">复制完成啦</div>
+    </div>
+
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

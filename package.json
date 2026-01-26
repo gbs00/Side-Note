@@ -1,0 +1,22 @@
+{
+  "name": "side-note",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild extension/src/sidepanel.js --bundle --platform=browser --format=iife --sourcemap --outfile=extension/sidepanel.js",
+    "build:prod": "esbuild extension/src/sidepanel.js --bundle --platform=browser --format=iife --minify --outfile=extension/sidepanel.js"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.3.3",
+    "@codemirror/lang-markdown": "^6.2.5",
+    "@codemirror/language": "^6.9.2",
+    "@codemirror/language-data": "^6.4.1",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.24.0",
+    "@lezer/highlight": "^1.2.0",
+    "codemirror": "^6.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Side Note",
+  "version": "0.1.0",
+  "description": "轻量级网页笔记工具",
+  "action": {
+    "default_title": "Side Note"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "permissions": ["sidePanel", "storage", "activeTab"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

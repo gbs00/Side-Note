@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Side Note Prototype</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- Simulation of a browser window background -->
+    <div class="browser-bg">
+        <h1>Wiki Page: Advanced Coding Patterns</h1>
+        <p>The <strong>Observer pattern</strong> is a software design pattern in which an object, named the
+            <strong>subject</strong>, maintains a list of its dependents, called <strong>observers</strong>, and
+            notifies them automatically of any state changes, usually by calling one of their methods.
+        </p>
+        <p>It is mainly used for implementing distributed event handling systems, in "event driven" software. In those
+            systems, the subject is usually named a "stream of events" or "stream source of events", while the observers
+            are called "sinks of events".</p>
+    </div>
+
+    <!-- The Side Note Extension Window -->
+    <div class="side-note-panel" id="sidePanel">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="logo-area">
+                <span class="logo-icon">📝</span>
+                <span class="app-name">Side Note</span>
+            </div>
+            <div class="actions">
+                <button class="icon-btn" id="themeToggle" title="Toggle Theme">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="sun-icon">
+                        <path
+                            d="M12 3V4M12 20V21M4 12H3M21 12H20M5.636 5.636L6.343 6.343M17.657 17.657L18.364 18.364M5.636 18.364L6.343 17.657M17.657 6.343L18.364 5.636M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12Z"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="moon-icon" style="display:none;">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
+                <button class="icon-btn" id="copyBtn" title="Copy All">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                        <path
+                            d="M5 15H4C2.89543 15 2 14.1046 2 13V4C2 2.89543 2.89543 2 4 2H13C14.1046 2 15 2.89543 15 4V5"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
+                <button class="icon-btn" id="closeBtn" title="Close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Metadata -->
+        <div class="metadata">
+            <div class="meta-row">
+                <span class="meta-label" title="URL">🔗</span>
+                <span class="meta-value" contenteditable="true">wiki.example.com/observer-pattern</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label" title="Page Title">📑</span>
+                <span class="meta-value" contenteditable="true">Wiki Page: Advanced Coding Patterns</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label" title="Created Time">📅</span>
+                <span class="meta-value" contenteditable="true">2026-01-23 15:45</span>
+            </div>
+        </div>
+
+        <!-- Editor Area -->
+        <div class="editor" contenteditable="true">
+            <h1>Observer Pattern</h1>
+            <p>Key concepts derived from the article:</p>
+            <ul>
+                <li>Defined relationship between <strong>Subject</strong> and <strong>Observer</strong>.</li>
+                <li>Used heavily in event-driven systems.</li>
+            </ul>
+            <blockquote>"The subject notifies observers automatically of any state changes."</blockquote>
+            <p>This is <span class="highlight">crucial for understanding RxJS</span> and other reactive libraries.</p>
+            <p><br></p> <!-- Empty line for typing -->
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast hidden">复制完成啦</div>
+
+        <!-- Resize Handle (Visual Only for MVP) -->
+        <div class="resize-handle"></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

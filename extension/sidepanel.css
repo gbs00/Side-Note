@@ -1,0 +1,337 @@
+/* CSS Variables for Theming */
+:root {
+  --bg-app: #f9f9f9;
+  --bg-header: #f1f1ef;
+  --text-primary: #333333;
+  --text-secondary: #9b9a97;
+  --border-color: #e6e6e6;
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --selection-bg: #d9eff8;
+  --shadow-panel: 0px 8px 30px rgba(0, 0, 0, 0.12);
+  --editor-font-size: 15px;
+  --editor-line-height: 24px;
+  --editor-h1-size: 20px;
+  --editor-h2-size: 18px;
+  --editor-h3-size: 16px;
+}
+
+[data-theme="dark"] {
+  --bg-app: #1e1e1e;
+  --bg-header: #2f3437;
+  --text-primary: #e0e0e0;
+  --text-secondary: #aaaaaa;
+  --border-color: #3f4447;
+  --hover-bg: rgba(255, 255, 255, 0.055);
+  --selection-bg: rgba(90, 120, 150, 0.35);
+  --shadow-panel: 0px 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  font-family: "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  color: var(--text-primary);
+  background-color: var(--bg-app);
+}
+
+.panel {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-app);
+  border-left: 1px solid var(--border-color);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+
+.panel::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle at bottom right, #efdecd 0%, rgba(240, 230, 210, 0.3) 40%, transparent 70%);
+  pointer-events: none;
+  opacity: 0.8;
+  mix-blend-mode: multiply;
+}
+
+[data-theme="dark"] .panel::after {
+  display: none;
+}
+
+.header {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background-color: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.actions {
+  display: flex;
+  gap: 4px;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.icon-btn:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.metadata {
+  padding: 12px 20px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.meta-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  outline: none;
+  min-width: 0;
+}
+
+.meta-input:hover {
+  background-color: var(--hover-bg);
+}
+
+.meta-input:focus {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--text-secondary);
+}
+
+.editor {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.editor-surface {
+  height: 100%;
+  min-height: 0;
+}
+
+.cm-editor {
+  height: 100%;
+  background: transparent !important;
+  color: var(--text-primary);
+  outline: none;
+  border: none;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+  box-shadow: none;
+}
+
+.cm-scroller {
+  font-family: inherit;
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
+  padding: 8px 20px 24px 20px;
+  overflow: auto;
+  background-color: transparent !important;
+}
+
+.cm-content {
+  caret-color: var(--text-primary);
+  color: var(--text-primary);
+  background-color: transparent !important;
+}
+
+.cm-placeholder {
+  color: var(--text-secondary);
+  opacity: 0.65;
+}
+
+.cm-gutters {
+  display: none !important;
+  background-color: transparent !important;
+}
+
+.cm-line {
+  padding: 0;
+}
+
+/* 标题样式 - 通过 headingLinePlugin 使用 Decoration.line() 应用到 .cm-line */
+.cm-line.cm-h1 {
+  font-size: var(--editor-h1-size);
+  font-weight: 700;
+}
+
+.cm-line.cm-h2 {
+  font-size: var(--editor-h2-size);
+  font-weight: 700;
+}
+
+.cm-line.cm-h3 {
+  font-size: var(--editor-h3-size);
+  font-weight: 700;
+}
+
+.cm-line.cm-h4 {
+  font-size: calc(var(--editor-h3-size) - 1px);
+  font-weight: 700;
+}
+
+.cm-line.cm-h5,
+.cm-line.cm-h6 {
+  font-size: var(--editor-font-size);
+  font-weight: 700;
+}
+
+.cm-content .cm-strong {
+  font-weight: 700;
+}
+
+.cm-content .cm-em {
+  font-style: italic;
+}
+
+.cm-content .cm-quote {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.cm-content .cm-link {
+  color: #5a7fb2;
+  text-decoration: underline;
+}
+
+.cm-content .cm-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background-color: rgba(127, 127, 127, 0.16);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+.cm-hide-mark {
+  color: transparent;
+}
+
+.cm-selectionBackground,
+.cm-content::selection {
+  background-color: var(--selection-bg);
+}
+
+.cm-list-marker {
+  color: var(--text-secondary);
+  display: inline-block;
+  min-width: 1.5ch;
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-scroller::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cm-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cm-scroller::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+[data-theme="dark"] .cm-scroller::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.toast {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 10;
+}
+
+.toast.visible {
+  opacity: 1;
+}
+
+.toast.success {
+  background-color: rgba(230, 244, 234, 0.85);
+  color: #1e4620;
+  border: 1px solid rgba(206, 234, 214, 0.5);
+}
+
+[data-theme="dark"] .toast.success {
+  background-color: rgba(30, 40, 32, 0.85);
+  color: #a6d6a8;
+  border: 1px solid rgba(45, 61, 47, 0.5);
+}
+
+.toast.error {
+  background-color: rgba(252, 232, 230, 0.85);
+  color: #8c1d18;
+  border: 1px solid rgba(250, 210, 207, 0.5);
+}
+
+[data-theme="dark"] .toast.error {
+  background-color: rgba(44, 26, 26, 0.85);
+  color: #f2b7b5;
+  border: 1px solid rgba(66, 31, 31, 0.5);
+}

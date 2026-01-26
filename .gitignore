@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+dist/
+.env
+
+# Build artifacts
+extension/sidepanel.js
+extension/sidepanel.js.map
+
+# Editors
+.vscode/
+.idea/
