@@ -3,10 +3,11 @@
  *
  * 架构概述：
  * - 使用 CodeMirror 6 作为底层编辑器
- * - 通过三个 ViewPlugin 实现 Markdown 实时渲染：
+ * - 通过多个 ViewPlugin 实现 Markdown 实时渲染：
  *   1. markdownMarkPlugin - 隐藏/折叠 Markdown 标记符号
  *   2. markdownStylePlugin - 为内容节点应用样式类
  *   3. headingLinePlugin - 为标题行应用行级样式
+ *   4. blockquoteLinePlugin - 为引用块行应用竖线样式
  * - 光标所在行显示原始 Markdown 语法，便于编辑
  */
 
@@ -22,7 +23,6 @@ import {
   highlightActiveLine,
   highlightSpecialChars,
   keymap,
-  placeholder,
   rectangularSelection
 } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
@@ -30,21 +30,57 @@ import { bracketMatching, indentOnInput, syntaxTree } from "@codemirror/language
 import { markdown, markdownKeymap } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 
+function getI18nMessage(key, fallback) {
+  try {
+    if (chrome?.i18n?.getMessage) {
+      const message = chrome.i18n.getMessage(key);
+      if (message) {
+        return message;
+      }
+    }
+  } catch (error) {
+    // Ignore and use fallback text.
+  }
+  return fallback;
+}
+
 // ============================================================================
 // 常量定义
 // ============================================================================
 
+const I18N_TEXT = {
+  appName: getI18nMessage("app_name", "Side Note"),
+  themeToggle: getI18nMessage("ui_theme_toggle", "切换主题"),
+  copy: getI18nMessage("ui_copy", "复制"),
+  copyAllContent: getI18nMessage("ui_copy_all_content", "复制全部内容"),
+  close: getI18nMessage("ui_close", "关闭"),
+  closePanel: getI18nMessage("ui_close_panel", "关闭面板"),
+  metaUrl: getI18nMessage("ui_meta_url", "网页链接"),
+  metaTitle: getI18nMessage("ui_meta_title", "网页标题"),
+  metaCreated: getI18nMessage("ui_meta_created", "创建时间"),
+  editorContent: getI18nMessage("ui_editor_content", "笔记内容"),
+  emptyTitle: getI18nMessage("ui_empty_title", "还没有内容"),
+  emptyDesc: getI18nMessage("ui_empty_desc", "在右侧开始记录你的灵感"),
+  emptyFallback: getI18nMessage("msg_empty_fallback", "未获取到哦，可手动输入"),
+  copySuccess: getI18nMessage("toast_copy_success", "复制完成啦"),
+  copyError: getI18nMessage("toast_copy_error", "复制失败咯，请重试")
+};
+
 const NOTE_PREFIX = "note:";
-const EMPTY_TEXT = "未获取到哦，可手动输入";
+const EMPTY_TEXT = I18N_TEXT.emptyFallback;
 
 
 const elements = {
+  appName: document.getElementById("appName"),
   themeToggle: document.getElementById("themeToggle"),
   copyBtn: document.getElementById("copyBtn"),
   closeBtn: document.getElementById("closeBtn"),
   metaUrl: document.getElementById("metaUrl"),
   metaTitle: document.getElementById("metaTitle"),
   metaCreated: document.getElementById("metaCreated"),
+  emptyState: document.getElementById("emptyState"),
+  emptyTitle: document.getElementById("emptyTitle"),
+  emptyDesc: document.getElementById("emptyDesc"),
   toast: document.getElementById("toast"),
   sunIcon: document.querySelector(".sun-icon"),
   moonIcon: document.querySelector(".moon-icon"),
@@ -667,6 +703,52 @@ const headingLinePlugin = ViewPlugin.fromClass(
   }
 );
 
+const BLOCKQUOTE_LINE_NODE_NAMES = new Set(["Blockquote", "BlockQuote"]);
+
+function buildBlockquoteLineDecorations(view) {
+  const { state } = view;
+  const decorations = [];
+  const seenLines = new Set();
+
+  syntaxTree(state).iterate({
+    enter(node) {
+      if (!BLOCKQUOTE_LINE_NODE_NAMES.has(node.name)) {
+        return;
+      }
+      const startLine = state.doc.lineAt(node.from).number;
+      const endPos = Math.max(node.from, node.to - 1);
+      const endLine = state.doc.lineAt(endPos).number;
+      for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
+        const line = state.doc.line(lineNumber);
+        if (seenLines.has(line.number)) {
+          continue;
+        }
+        seenLines.add(line.number);
+        decorations.push(Decoration.line({ class: "cm-quote-line" }).range(line.from));
+      }
+    }
+  });
+
+  return Decoration.set(decorations, true);
+}
+
+const blockquoteLinePlugin = ViewPlugin.fromClass(
+  class {
+    constructor(view) {
+      this.decorations = buildBlockquoteLineDecorations(view);
+    }
+
+    update(update) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = buildBlockquoteLineDecorations(update.view);
+      }
+    }
+  },
+  {
+    decorations: (value) => value.decorations
+  }
+);
+
 function getNoteKey(tabId) {
   return `${NOTE_PREFIX}${tabId}`;
 }
@@ -692,6 +774,56 @@ function debounce(fn, delay) {
   };
 }
 
+function applyI18n() {
+  try {
+    if (chrome?.i18n?.getUILanguage) {
+      const uiLanguage = chrome.i18n.getUILanguage();
+      if (uiLanguage) {
+        document.documentElement.lang = uiLanguage;
+      }
+    }
+  } catch (error) {
+    // Ignore and keep fallback lang attribute.
+  }
+  document.title = I18N_TEXT.appName;
+  if (elements.appName) {
+    elements.appName.textContent = I18N_TEXT.appName;
+  }
+  if (elements.themeToggle) {
+    elements.themeToggle.title = I18N_TEXT.themeToggle;
+    elements.themeToggle.setAttribute("aria-label", I18N_TEXT.themeToggle);
+  }
+  if (elements.copyBtn) {
+    elements.copyBtn.title = I18N_TEXT.copy;
+    elements.copyBtn.setAttribute("aria-label", I18N_TEXT.copyAllContent);
+  }
+  if (elements.closeBtn) {
+    elements.closeBtn.title = I18N_TEXT.close;
+    elements.closeBtn.setAttribute("aria-label", I18N_TEXT.closePanel);
+  }
+  if (elements.metaUrl) {
+    elements.metaUrl.setAttribute("aria-label", I18N_TEXT.metaUrl);
+  }
+  if (elements.metaTitle) {
+    elements.metaTitle.setAttribute("aria-label", I18N_TEXT.metaTitle);
+  }
+  if (elements.metaCreated) {
+    elements.metaCreated.setAttribute("aria-label", I18N_TEXT.metaCreated);
+  }
+  if (elements.editorRoot) {
+    elements.editorRoot.setAttribute("aria-label", I18N_TEXT.editorContent);
+  }
+  if (elements.emptyTitle) {
+    elements.emptyTitle.textContent = I18N_TEXT.emptyTitle;
+  }
+  if (elements.emptyDesc) {
+    elements.emptyDesc.textContent = I18N_TEXT.emptyDesc;
+  }
+  if (elements.toast) {
+    elements.toast.textContent = I18N_TEXT.copySuccess;
+  }
+}
+
 function resolveTheme(preference) {
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   if (preference === "auto") {
@@ -704,22 +836,33 @@ function applyTheme(preference) {
   const resolved = resolveTheme(preference);
   document.documentElement.setAttribute("data-theme", resolved);
   if (resolved === "dark") {
-    elements.sunIcon.style.display = "none";
-    elements.moonIcon.style.display = "block";
-  } else {
+    // 设计稿：深色模式显示“太阳”图标（表示可切换到亮色）
     elements.sunIcon.style.display = "block";
     elements.moonIcon.style.display = "none";
+  } else {
+    // 设计稿：浅色模式显示“月亮”图标（表示可切换到深色）
+    elements.sunIcon.style.display = "none";
+    elements.moonIcon.style.display = "block";
   }
 }
 
 async function loadTheme() {
-  const stored = await chrome.storage.local.get("theme");
-  state.themePreference = stored.theme || "auto";
+  try {
+    const stored = await chrome.storage.local.get("theme");
+    state.themePreference = stored.theme || "auto";
+  } catch (error) {
+    state.themePreference = "auto";
+    console.warn("Failed to load theme:", error);
+  }
   applyTheme(state.themePreference);
 }
 
 async function saveTheme() {
-  await chrome.storage.local.set({ theme: state.themePreference });
+  try {
+    await chrome.storage.local.set({ theme: state.themePreference });
+  } catch (error) {
+    console.warn("Failed to save theme:", error);
+  }
 }
 
 function cycleThemePreference() {
@@ -743,10 +886,15 @@ async function loadNote() {
   const RETRY_DELAY = 50;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const stored = await chrome.storage.session.get(key);
-    if (stored[key]) {
-      state.note = stored[key];
-      return;
+    try {
+      const stored = await chrome.storage.session.get(key);
+      if (stored[key]) {
+        state.note = stored[key];
+        return;
+      }
+    } catch (error) {
+      console.warn("Failed to load note:", error);
+      break;
     }
     // 仅在非最后一次尝试时等待
     if (attempt < MAX_RETRIES - 1) {
@@ -778,6 +926,36 @@ function renderMeta() {
   elements.metaUrl.title = elements.metaUrl.value;
   elements.metaTitle.title = elements.metaTitle.value;
   elements.metaCreated.title = elements.metaCreated.value;
+  syncMetaRowStates();
+}
+
+function setMetaRowEmpty(input, isEmpty) {
+  if (!input) {
+    return;
+  }
+  const row = input.closest(".meta-row");
+  if (!row) {
+    return;
+  }
+  if (isEmpty) {
+    row.setAttribute("data-empty", "true");
+  } else {
+    row.removeAttribute("data-empty");
+  }
+}
+
+function syncMetaRowStates() {
+  setMetaRowEmpty(elements.metaUrl, elements.metaUrl.value === EMPTY_TEXT);
+  setMetaRowEmpty(elements.metaTitle, elements.metaTitle.value === EMPTY_TEXT);
+  setMetaRowEmpty(elements.metaCreated, elements.metaCreated.value === EMPTY_TEXT);
+}
+
+function updateEmptyStateVisibility() {
+  if (!elements.emptyState) {
+    return;
+  }
+  const content = state.note?.contentMd || "";
+  elements.emptyState.classList.toggle("visible", content.trim().length === 0);
 }
 
 const persistNote = debounce(async () => {
@@ -786,7 +964,11 @@ const persistNote = debounce(async () => {
   }
   state.note.updatedAt = formatDateTime(new Date());
   const key = getNoteKey(state.tabId);
-  await chrome.storage.session.set({ [key]: state.note });
+  try {
+    await chrome.storage.session.set({ [key]: state.note });
+  } catch (error) {
+    console.warn("Failed to persist note:", error);
+  }
 }, 300);
 
 function buildExportText() {
@@ -856,6 +1038,7 @@ function initEditor() {
       return;
     }
     state.note.contentMd = update.state.doc.toString();
+    updateEmptyStateVisibility();
     persistNote();
   });
 
@@ -868,17 +1051,19 @@ function initEditor() {
       extensions: [
         editorSetup,
         EditorView.lineWrapping,
-        placeholder("开始记录吧..."),
         markdown({ codeLanguages: languages }),
         pendingLineField,
         pendingLineEvents,
         headingLinePlugin,
+        blockquoteLinePlugin,
         markdownStylePlugin,
         markdownMarkPlugin,
         updateListener
       ]
     })
   });
+
+  updateEmptyStateVisibility();
 }
 
 function bindEvents() {
@@ -887,9 +1072,9 @@ function bindEvents() {
     const exportText = buildExportText();
     const success = await writeClipboard(exportText);
     if (success) {
-      showToast("复制完成啦", "success");
+      showToast(I18N_TEXT.copySuccess, "success");
     } else {
-      showToast("复制失败咯，请重试", "error");
+      showToast(I18N_TEXT.copyError, "error");
     }
   });
 
@@ -897,11 +1082,7 @@ function bindEvents() {
     if (!Number.isInteger(state.tabId)) {
       return;
     }
-    // Bug 3 Fix: Do NOT clear note on close.
-    // We only close the window, keeping data in storage session.
-    // await chrome.runtime.sendMessage({ type: "CLEAR_NOTE", tabId: state.tabId, reason: "user_close" });
-
-    // Also do not clear local state or editor
+    // 口径：关闭面板（X）不清空，数据随 tab/窗口/浏览器关闭统一清理
     try {
       window.close();
     } catch (error) {
@@ -915,6 +1096,7 @@ function bindEvents() {
     }
     state.note.url = elements.metaUrl.value;
     elements.metaUrl.title = elements.metaUrl.value;
+    syncMetaRowStates();
     persistNote();
   });
 
@@ -924,6 +1106,7 @@ function bindEvents() {
     }
     state.note.title = elements.metaTitle.value;
     elements.metaTitle.title = elements.metaTitle.value;
+    syncMetaRowStates();
     persistNote();
   });
 
@@ -933,6 +1116,7 @@ function bindEvents() {
     }
     state.note.createdAt = elements.metaCreated.value;
     elements.metaCreated.title = elements.metaCreated.value;
+    syncMetaRowStates();
     persistNote();
   });
 
@@ -944,39 +1128,45 @@ function bindEvents() {
 
   // Listen for storage changes to handle race condition with background.js.
   // When background.js writes the real url/title, we update the UI reactively.
-  chrome.storage.session.onChanged.addListener((changes) => {
+  if (!chrome || !chrome.storage || !chrome.storage.onChanged || !chrome.storage.onChanged.addListener) {
+    return;
+  }
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "session") {
+      return;
+    }
     const key = getNoteKey(state.tabId);
     if (changes[key]?.newValue) {
       const newNote = changes[key].newValue;
       // Only update meta fields if they have real values (not our placeholder)
       // and the user hasn't manually edited them.
       if (state.note) {
+        let didUpdateMeta = false;
         if (state.note.url === EMPTY_TEXT && newNote.url && newNote.url !== EMPTY_TEXT) {
           state.note.url = newNote.url;
           elements.metaUrl.value = newNote.url;
           elements.metaUrl.title = newNote.url;
+          didUpdateMeta = true;
         }
         if (state.note.title === EMPTY_TEXT && newNote.title && newNote.title !== EMPTY_TEXT) {
           state.note.title = newNote.title;
           elements.metaTitle.value = newNote.title;
           elements.metaTitle.title = newNote.title;
+          didUpdateMeta = true;
         }
         if (state.note.createdAt === EMPTY_TEXT && newNote.createdAt && newNote.createdAt !== EMPTY_TEXT) {
           state.note.createdAt = newNote.createdAt;
           elements.metaCreated.value = newNote.createdAt;
           elements.metaCreated.title = newNote.createdAt;
+          didUpdateMeta = true;
+        }
+        if (didUpdateMeta) {
+          syncMetaRowStates();
         }
       }
     }
   });
-}
-
-function initPort() {
-  if (!Number.isInteger(state.tabId)) {
-    return;
-  }
-  const port = chrome.runtime.connect({ name: "sidepanel" });
-  port.postMessage({ type: "PANEL_OPEN", tabId: state.tabId });
 }
 
 function parseTabId() {
@@ -990,7 +1180,7 @@ function parseTabId() {
 
 async function init() {
   state.tabId = parseTabId();
-  initPort();
+  applyI18n();
   await loadTheme();
   await loadNote();
   renderMeta();

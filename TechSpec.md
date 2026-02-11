@@ -1,43 +1,45 @@
 # 技术方案设计（Tech Spec）
 
-> 版本：v1.2（Obsidian 风格列表编号 + 编辑器优化）
-> 更新日期：2026-01-26
+## 修订记录
+| 日期 | 版本 | 变更内容 |
+| --- | --- | --- |
+| 2026-02-03 | v1.1 | 持久化锚点由 URL 改为 Tab 实例；统一清理：关闭 tab/窗口/退出浏览器即清空；UI 20260203 样式更新 |
+| 2026-01-26 | v1.0 | Obsidian 风格列表编号 + 编辑器优化 |
+
+> 版本：v1.1
+> 更新日期：2026-02-03
 
 ## 1. 总体架构
 - 采用 MV3 扩展结构：`background service worker` + `sidePanel UI`，不使用 content script（降低权限与兼容风险）。
-- 数据仅存于 `chrome.storage.session`（按 tabId 隔离），满足“关闭面板/标签/浏览器即清空”的需求。
+- 数据仅存于 `chrome.storage.session`（按 tabId 隔离），满足“关闭标签页/关闭窗口/退出浏览器即清空”的需求；关闭面板（X）不清空。
 - `sidePanel` 作为唯一 UI 面板，右侧停靠、全高、可调宽度（符合 sidePanel 限制）。
+- 不支持浏览器重启后恢复 note（为确保“退出即清空”的统一口径）。
 
 ## 2. 关键流程（Mermaid）
 ```mermaid
 flowchart TD
 A[用户点击工具栏图标] --> B[background: action.onClicked(tab)]
-B --> C[初始化 note: url/title/createdAt -> storage.session[tabId]]
+B --> C[initNoteForTab(tabId) -> storage.session note:tabId]
 B --> D[sidePanel.setOptions(path?tabId) + open(tabId)]
 D --> E[sidePanel 加载 -> 读取 session -> 渲染头部与正文]
 E --> F[用户输入 -> debounce 更新 session]
-E --> G[用户点击复制 -> 生成导出文本]
-G --> H{clipboard 成功?}
-H -->|是| I[Toast 成功]
-H -->|否| J[Toast 失败 + 可重试/手动复制入口]
-E --> K[用户点击 X]
-K --> L[background 清空 session + disable sidePanel]
-M[tabs.onRemoved] --> L
-N[sidePanel port.onDisconnect] --> L
+E --> G[用户点击复制 -> 生成导出文本 -> clipboard]
+E --> H[用户点击 X -> 仅关闭面板（不清空）]
+I[tabs.onRemoved(tabId)] --> J[清空 session note:tabId + disable sidePanel]
+K[退出浏览器] --> L[storage.session 会话级清空]
 ```
 
 ## 3. 模块划分与职责
 - `background/service_worker`
   - `action.onClicked(tab)`：创建 note 并打开 sidePanel。
-  - `runtime.onConnect`：维护 tabId 与 panel 连接；`onDisconnect` 清空。
-  - `tabs.onRemoved`：清空对应 tab 的 note。
+  - `tabs.onRemoved`：清空对应 tab 的 note（统一覆盖“关闭 tab/窗口”场景）。
   - `sidePanel.setOptions/open`：为每个 tab 设置 `path?tabId`。
 - `sidePanel UI`
   - 读取 `tabId` 参数与 session 数据，渲染头部字段 + 编辑区。
   - Markdown 实时渲染（标准语法），安全消毒。
   - 复制导出与提示。
   - 主题切换（跟随系统或手动覆盖）。
-  - 点击 `x`：关闭面板（数据保留在 session）。
+  - 点击 `x`：关闭面板（数据保留在 session，直到 tab/窗口/浏览器关闭）。
 
 ## 4. 数据结构与存储
 - `NoteState`（存于 `chrome.storage.session`，key: `note:${tabId}`）
@@ -53,14 +55,13 @@ N[sidePanel port.onDisconnect] --> L
 
 ## 5. 接口与消息定义
 - `background -> storage.session`
-  - `initNote(tab)`：写入 `note:${tabId}`
-  - `clearNote(tabId, reason)`
-- `sidePanel -> background`
-  - `PORT_CONNECT(tabId)`：连接与断开用于清空判定（注：v1.1 移除断开清空，改为持久化）
-  - `CLEAR_NOTE(tabId, reason)`：点击 `x` 后触发（v1.1: 仅关闭窗口，不清空数据）
+  - `initNoteForTab(tabId)`：写入 `note:${tabId}`
+  - `clearNote(tabId)`：移除 `note:${tabId}` 并 disable sidePanel
 - `sidePanel -> storage.session`
-  - `getNote(tabId)`
-  - `updateContent(tabId, md)`（建议 300ms debounce）
+  - `loadNote(tabId)`：读取 `note:${tabId}`
+  - `persistNote(tabId, note)`：更新 `note:${tabId}`（建议 300ms debounce）
+- `sidePanel -> storage.local`
+  - `loadTheme()/saveTheme()`：主题偏好仅存 `local`，不随退出清空
 
 ## 6. Markdown 渲染与安全
 - 使用 CodeMirror 6 的 Markdown 解析（默认 CommonMark），不渲染 HTML。
@@ -103,7 +104,7 @@ created_at: <createdAt>
 
 ## 11. 非功能性约束
 - 性能：输入更新需 debounce，避免频繁写 session。
-- 稳定性：面板断开、tab 关闭、浏览器关闭时保证 session 清空。
+- 稳定性：tab/窗口关闭时保证对应 tab 的 session 清空；浏览器退出时 `storage.session` 会话级清空。
 - 安全：Markdown 渲染必须消毒。
 
 ## 12. 构建配置

@@ -1,0 +1,70 @@
+{
+  "app_name": {
+    "message": "Side Note",
+    "description": "插件名称"
+  },
+  "app_description": {
+    "message": "轻量级网页笔记工具",
+    "description": "插件描述"
+  },
+  "action_default_title": {
+    "message": "Side Note",
+    "description": "工具栏悬浮标题"
+  },
+  "ui_theme_toggle": {
+    "message": "切换主题",
+    "description": "主题切换按钮文案"
+  },
+  "ui_copy": {
+    "message": "复制",
+    "description": "复制按钮文案"
+  },
+  "ui_copy_all_content": {
+    "message": "复制全部内容",
+    "description": "复制按钮无障碍文案"
+  },
+  "ui_close": {
+    "message": "关闭",
+    "description": "关闭按钮文案"
+  },
+  "ui_close_panel": {
+    "message": "关闭面板",
+    "description": "关闭按钮无障碍文案"
+  },
+  "ui_meta_url": {
+    "message": "网页链接",
+    "description": "URL 输入框无障碍文案"
+  },
+  "ui_meta_title": {
+    "message": "网页标题",
+    "description": "标题输入框无障碍文案"
+  },
+  "ui_meta_created": {
+    "message": "创建时间",
+    "description": "创建时间输入框无障碍文案"
+  },
+  "ui_editor_content": {
+    "message": "笔记内容",
+    "description": "编辑器无障碍文案"
+  },
+  "ui_empty_title": {
+    "message": "还没有内容",
+    "description": "空状态标题"
+  },
+  "ui_empty_desc": {
+    "message": "在右侧开始记录你的灵感",
+    "description": "空状态描述"
+  },
+  "msg_empty_fallback": {
+    "message": "未获取到哦，可手动输入",
+    "description": "未获取到页面信息时的回退文案"
+  },
+  "toast_copy_success": {
+    "message": "复制完成啦",
+    "description": "复制成功提示"
+  },
+  "toast_copy_error": {
+    "message": "复制失败咯，请重试",
+    "description": "复制失败提示"
+  }
+}

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Background -->
+  <rect x="16" y="8" width="96" height="112" rx="8" fill="#5A9FD4"/>
+  <!-- Lines representing text -->
+  <rect x="28" y="28" width="56" height="6" rx="3" fill="#FFFFFF"/>
+  <rect x="28" y="44" width="72" height="6" rx="3" fill="#FFFFFF" opacity="0.8"/>
+  <rect x="28" y="60" width="64" height="6" rx="3" fill="#FFFFFF" opacity="0.8"/>
+  <rect x="28" y="76" width="48" height="6" rx="3" fill="#FFFFFF" opacity="0.6"/>
+  <!-- Pencil icon -->
+  <path d="M88 88 L104 72 L112 80 L96 96 L84 100 Z" fill="#FFD54F"/>
+  <path d="M104 72 L112 80 L108 76 L100 68 Z" fill="#FFA000"/>
+</svg>

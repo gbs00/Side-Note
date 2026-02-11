@@ -1,0 +1,70 @@
+{
+  "app_name": {
+    "message": "Side Note",
+    "description": "Extension name"
+  },
+  "app_description": {
+    "message": "Lightweight web note-taking tool",
+    "description": "Extension description"
+  },
+  "action_default_title": {
+    "message": "Side Note",
+    "description": "Toolbar action title"
+  },
+  "ui_theme_toggle": {
+    "message": "Switch theme",
+    "description": "Theme toggle button text"
+  },
+  "ui_copy": {
+    "message": "Copy",
+    "description": "Copy button text"
+  },
+  "ui_copy_all_content": {
+    "message": "Copy all content",
+    "description": "Copy button aria label"
+  },
+  "ui_close": {
+    "message": "Close",
+    "description": "Close button text"
+  },
+  "ui_close_panel": {
+    "message": "Close panel",
+    "description": "Close button aria label"
+  },
+  "ui_meta_url": {
+    "message": "Page URL",
+    "description": "URL input aria label"
+  },
+  "ui_meta_title": {
+    "message": "Page title",
+    "description": "Title input aria label"
+  },
+  "ui_meta_created": {
+    "message": "Created at",
+    "description": "Created time input aria label"
+  },
+  "ui_editor_content": {
+    "message": "Note content",
+    "description": "Editor aria label"
+  },
+  "ui_empty_title": {
+    "message": "No content yet",
+    "description": "Empty state title"
+  },
+  "ui_empty_desc": {
+    "message": "Start capturing your ideas on the right",
+    "description": "Empty state description"
+  },
+  "msg_empty_fallback": {
+    "message": "Not available yet, you can enter it manually",
+    "description": "Fallback text when page info is unavailable"
+  },
+  "toast_copy_success": {
+    "message": "Copied successfully",
+    "description": "Copy success toast"
+  },
+  "toast_copy_error": {
+    "message": "Copy failed, please try again",
+    "description": "Copy failed toast"
+  }
+}

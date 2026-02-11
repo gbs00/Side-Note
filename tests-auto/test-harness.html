@@ -3,8 +3,161 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Side Note</title>
-    <link rel="stylesheet" href="sidepanel.css">
+    <title>Side Note - Test Harness</title>
+    <link rel="stylesheet" href="../extension/sidepanel.css">
+    <script>
+      const urlParams = new URLSearchParams(window.location.search);
+      const locale = urlParams.get('locale') || 'zh_CN';
+      const messages = {
+        zh_CN: {
+          app_name: 'Side Note',
+          ui_theme_toggle: '切换主题',
+          ui_copy: '复制',
+          ui_copy_all_content: '复制全部内容',
+          ui_close: '关闭',
+          ui_close_panel: '关闭面板',
+          ui_meta_url: '网页链接',
+          ui_meta_title: '网页标题',
+          ui_meta_created: '创建时间',
+          ui_editor_content: '笔记内容',
+          ui_empty_title: '还没有内容',
+          ui_empty_desc: '在右侧开始记录你的灵感',
+          msg_empty_fallback: '未获取到哦，可手动输入',
+          toast_copy_success: '复制完成啦',
+          toast_copy_error: '复制失败咯，请重试'
+        },
+        en: {
+          app_name: 'Side Note',
+          ui_theme_toggle: 'Switch theme',
+          ui_copy: 'Copy',
+          ui_copy_all_content: 'Copy all content',
+          ui_close: 'Close',
+          ui_close_panel: 'Close panel',
+          ui_meta_url: 'Page URL',
+          ui_meta_title: 'Page title',
+          ui_meta_created: 'Created at',
+          ui_editor_content: 'Note content',
+          ui_empty_title: 'No content yet',
+          ui_empty_desc: 'Start capturing your ideas on the right',
+          msg_empty_fallback: 'Not available yet, you can enter it manually',
+          toast_copy_success: 'Copied successfully',
+          toast_copy_error: 'Copy failed, please try again'
+        }
+      };
+
+      // Mock Chrome Extension APIs for testing
+      window.chrome = {
+        i18n: {
+          getMessage: function(key) {
+            return messages[locale]?.[key] || '';
+          },
+          getUILanguage: function() {
+            return locale === 'en' ? 'en-US' : 'zh-CN';
+          }
+        },
+        storage: {
+          onChanged: {
+            _listeners: [],
+            addListener: function(listener) {
+              this._listeners.push(listener);
+            }
+          },
+          session: {
+            _data: {},
+            _emitChanged: function(changes) {
+              for (const listener of chrome.storage.onChanged._listeners) {
+                try {
+                  listener(changes, 'session');
+                } catch (error) {
+                  // ignore listener errors in harness
+                }
+              }
+            },
+            get: async function(keys) {
+              if (keys === null) return this._data;
+              if (typeof keys === 'string') {
+                return { [keys]: this._data[keys] };
+              }
+              const result = {};
+              for (const k of keys) {
+                result[k] = this._data[k];
+              }
+              return result;
+            },
+            set: async function(items) {
+              const changes = {};
+              for (const [key, value] of Object.entries(items)) {
+                changes[key] = { oldValue: this._data[key], newValue: value };
+                this._data[key] = value;
+              }
+              this._emitChanged(changes);
+            },
+            remove: async function(keys) {
+              const list = typeof keys === 'string' ? [keys] : keys;
+              const changes = {};
+              for (const key of list) {
+                changes[key] = { oldValue: this._data[key], newValue: undefined };
+                delete this._data[key];
+              }
+              this._emitChanged(changes);
+            }
+          },
+          local: {
+            _data: { theme: 'auto' },
+            _emitChanged: function(changes) {
+              for (const listener of chrome.storage.onChanged._listeners) {
+                try {
+                  listener(changes, 'local');
+                } catch (error) {
+                  // ignore listener errors in harness
+                }
+              }
+            },
+            get: async function(keys) {
+              if (keys === null) return this._data;
+              if (typeof keys === 'string') {
+                return { [keys]: this._data[keys] };
+              }
+              const result = {};
+              for (const k of keys) {
+                result[k] = this._data[k];
+              }
+              return result;
+            },
+            set: async function(items) {
+              const changes = {};
+              for (const [key, value] of Object.entries(items)) {
+                changes[key] = { oldValue: this._data[key], newValue: value };
+                this._data[key] = value;
+              }
+              this._emitChanged(changes);
+            }
+          }
+        },
+        runtime: {
+          connect: function() {
+            return {
+              postMessage: function() {},
+              onDisconnect: { addListener: function() {} }
+            };
+          },
+          sendMessage: function() {}
+        }
+      };
+
+      // Pre-populate test data
+      const tabId = urlParams.get('tabId') || '12345';
+      const noteKey = `note:${tabId}`;
+      
+      chrome.storage.session._data[noteKey] = {
+        tabId: parseInt(tabId),
+        url: 'https://example.com/test-page',
+        title: 'Test Page Title',
+        createdAt: '2026-01-26 12:00:00',
+        contentMd: '',
+        updatedAt: '2026-01-26 12:00:00'
+      };
+    </script>
   </head>
   <body>
     <div class="panel" id="sidePanel">
@@ -119,6 +272,6 @@
       <div id="toast" class="toast">复制完成啦</div>
     </div>
 
-    <script src="sidepanel.js"></script>
+    <script src="../extension/sidepanel.js"></script>
   </body>
 </html>
