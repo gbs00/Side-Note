@@ -8,6 +8,19 @@
     <script>
       const urlParams = new URLSearchParams(window.location.search);
       const locale = urlParams.get('locale') || 'zh_CN';
+      const SESSION_STORAGE_KEY = '__side_note_test_session__';
+
+      function readSessionData() {
+        try {
+          return JSON.parse(sessionStorage.getItem(SESSION_STORAGE_KEY) || '{}');
+        } catch (error) {
+          return {};
+        }
+      }
+
+      function writeSessionData(data) {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
+      }
       const messages = {
         zh_CN: {
           app_name: 'Side Note',
@@ -24,7 +37,8 @@
           ui_empty_desc: '在右侧开始记录你的灵感',
           msg_empty_fallback: '未获取到哦，可手动输入',
           toast_copy_success: '复制完成啦',
-          toast_copy_error: '复制失败咯，请重试'
+          toast_copy_error: '复制失败咯，请重试',
+          toast_save_error: '保存失败，请重试后再关闭'
         },
         en: {
           app_name: 'Side Note',
@@ -41,7 +55,8 @@
           ui_empty_desc: 'Start capturing your ideas on the right',
           msg_empty_fallback: 'Not available yet, you can enter it manually',
           toast_copy_success: 'Copied successfully',
-          toast_copy_error: 'Copy failed, please try again'
+          toast_copy_error: 'Copy failed, please try again',
+          toast_save_error: 'Save failed. Please retry before closing'
         }
       };
 
@@ -63,7 +78,8 @@
             }
           },
           session: {
-            _data: {},
+            _data: readSessionData(),
+            _getCallCount: 0,
             _emitChanged: function(changes) {
               for (const listener of chrome.storage.onChanged._listeners) {
                 try {
@@ -74,9 +90,29 @@
               }
             },
             get: async function(keys) {
+              this._getCallCount += 1;
               if (keys === null) return this._data;
               if (typeof keys === 'string') {
-                return { [keys]: this._data[keys] };
+                const result = { [keys]: this._data[keys] };
+                // 在最后一次读取的快照生成后立即模拟 background 写入，
+                // 用于验证面板必须先注册监听器，不得丢失该变更事件。
+                if (urlParams.get('simulateInitRace') === '1' && this._getCallCount === 3) {
+                  const raceTabId = Number(urlParams.get('tabId'));
+                  const raceNote = {
+                    tabId: raceTabId,
+                    url: 'https://www.bilibili.com/video/BV1race',
+                    title: '初始化竞态中的真实标题',
+                    createdAt: '2026-07-15 09:00:00',
+                    contentMd: '',
+                    updatedAt: '2026-07-15 09:00:00'
+                  };
+                  this._data[keys] = raceNote;
+                  writeSessionData(this._data);
+                  this._emitChanged({
+                    [keys]: { oldValue: undefined, newValue: raceNote }
+                  });
+                }
+                return result;
               }
               const result = {};
               for (const k of keys) {
@@ -90,6 +126,7 @@
                 changes[key] = { oldValue: this._data[key], newValue: value };
                 this._data[key] = value;
               }
+              writeSessionData(this._data);
               this._emitChanged(changes);
             },
             remove: async function(keys) {
@@ -99,6 +136,7 @@
                 changes[key] = { oldValue: this._data[key], newValue: undefined };
                 delete this._data[key];
               }
+              writeSessionData(this._data);
               this._emitChanged(changes);
             }
           },
@@ -142,6 +180,12 @@
             };
           },
           sendMessage: function() {}
+        },
+        sidePanel: {
+          _closeCalls: [],
+          close: async function(options) {
+            this._closeCalls.push(options);
+          }
         }
       };
 
@@ -149,14 +193,17 @@
       const tabId = urlParams.get('tabId') || '12345';
       const noteKey = `note:${tabId}`;
       
-      chrome.storage.session._data[noteKey] = {
-        tabId: parseInt(tabId),
-        url: 'https://example.com/test-page',
-        title: 'Test Page Title',
-        createdAt: '2026-01-26 12:00:00',
-        contentMd: '',
-        updatedAt: '2026-01-26 12:00:00'
-      };
+      if (urlParams.get('simulateInitRace') !== '1' && !chrome.storage.session._data[noteKey]) {
+        chrome.storage.session._data[noteKey] = {
+          tabId: parseInt(tabId),
+          url: 'https://example.com/test-page',
+          title: 'Test Page Title',
+          createdAt: '2026-01-26 12:00:00',
+          contentMd: '',
+          updatedAt: '2026-01-26 12:00:00'
+        };
+        writeSessionData(chrome.storage.session._data);
+      }
     </script>
   </head>
   <body>

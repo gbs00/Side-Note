@@ -1,4 +1,5 @@
 const NOTE_PREFIX = "note:";
+const noteOperationChains = new Map();
 
 function getI18nMessage(key, fallback) {
   try {
@@ -31,6 +32,39 @@ function formatDateTime(date) {
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
 }
 
+function runAsyncOperation(operation, errorMessage) {
+  try {
+    // 调用必须保持同步发生，以便 sidePanel.open 仍处于用户点击手势中。
+    const result = operation();
+    if (result && typeof result.catch === "function") {
+      void result.catch((error) => {
+        console.warn(errorMessage, error);
+      });
+    }
+  } catch (error) {
+    console.warn(errorMessage, error);
+  }
+}
+
+function enqueueNoteOperation(tabId, operation) {
+  const previous = noteOperationChains.get(tabId) || Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  noteOperationChains.set(tabId, current);
+  void current.then(
+    () => {
+      if (noteOperationChains.get(tabId) === current) {
+        noteOperationChains.delete(tabId);
+      }
+    },
+    () => {
+      if (noteOperationChains.get(tabId) === current) {
+        noteOperationChains.delete(tabId);
+      }
+    }
+  );
+  return current;
+}
+
 async function initNoteForTab(tabId, tabFromClick) {
   const key = getNoteKey(tabId);
   try {
@@ -59,14 +93,37 @@ async function initNoteForTab(tabId, tabFromClick) {
   }
 
   const now = formatDateTime(new Date());
-  const note = {
-    tabId,
-    url,
-    title,
-    createdAt: now,
-    contentMd: "",
-    updatedAt: now
-  };
+  let note;
+
+  // tabs.get 期间面板可能已经产生本地编辑。写入前再读一次，
+  // 只补全占位元信息，避免用空正文覆盖用户刚刚输入的内容。
+  try {
+    const latestStored = await chrome.storage.session.get(key);
+    const latestNote = latestStored[key];
+    if (latestNote) {
+      note = {
+        ...latestNote,
+        tabId,
+        url: !latestNote.url || latestNote.url === EMPTY_TEXT ? url : latestNote.url,
+        title: !latestNote.title || latestNote.title === EMPTY_TEXT ? title : latestNote.title,
+        createdAt: latestNote.createdAt || now,
+        updatedAt: latestNote.updatedAt || now
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to re-read note from session:", error);
+  }
+
+  if (!note) {
+    note = {
+      tabId,
+      url,
+      title,
+      createdAt: now,
+      contentMd: "",
+      updatedAt: now
+    };
+  }
 
   try {
     await chrome.storage.session.set({ [key]: note });
@@ -83,64 +140,71 @@ async function clearNote(tabId) {
   } catch (error) {
     console.warn("Failed to remove note from session:", error);
   }
-  try {
-    await chrome.sidePanel.setOptions({ tabId, enabled: false });
-  } catch (error) {
-    // Ignore if side panel is not available.
+  if (typeof chrome.sidePanel?.setOptions === "function") {
+    try {
+      await chrome.sidePanel.setOptions({ tabId, enabled: false });
+    } catch (error) {
+      // 标签页已关闭时禁用面板可能失败，不影响会话笔记已清理。
+    }
   }
 }
 
 chrome.action.onClicked.addListener((tab) => {
-  if (!tab?.id) {
+  if (!Number.isInteger(tab?.id)) {
     return;
   }
 
   const tabId = tab.id;
-  if (!chrome.sidePanel) {
-    console.warn("Side panel API is unavailable in this Chrome version.");
+  if (
+    typeof chrome.sidePanel?.setOptions !== "function" ||
+    typeof chrome.sidePanel?.open !== "function"
+  ) {
+    console.warn("Side panel open API is unavailable; Chrome 116 or newer is required.");
     return;
   }
 
-  initNoteForTab(tabId, tab).catch((error) => {
-    console.warn("Failed to init note:", error);
-  });
+  runAsyncOperation(
+    () => enqueueNoteOperation(tabId, () => initNoteForTab(tabId, tab)),
+    "Failed to init note:"
+  );
 
-  chrome.sidePanel
-    .setOptions({
+  runAsyncOperation(
+    () => chrome.sidePanel.setOptions({
       tabId,
       enabled: true,
       path: `sidepanel.html?tabId=${tabId}`
-    })
-    .catch((error) => {
-      console.warn("Failed to set side panel options:", error);
-    });
+    }),
+    "Failed to set side panel options:"
+  );
 
-  chrome.sidePanel.open({ tabId }).catch((error) => {
-    console.warn("Failed to open side panel:", error);
-  });
+  runAsyncOperation(
+    () => chrome.sidePanel.open({ tabId }),
+    "Failed to open side panel:"
+  );
 });
 
 // 统一清理口径：关闭标签页/关闭窗口 -> tabs.onRemoved -> 清空该 tab 的 note
 chrome.tabs.onRemoved.addListener((tabId) => {
-  clearNote(tabId).catch((error) => {
-    console.warn("Failed to clear note:", error);
-  });
+  // 与该 tab 未完成的初始化串行：即使用户点击图标后立即关 tab，最后一步也必然是清理。
+  runAsyncOperation(
+    () => enqueueNoteOperation(tabId, () => clearNote(tabId)),
+    "Failed to clear note:"
+  );
 });
 
-// Optimization 1: Ensure side panel is not automatically enabled for new tabs
-// Optimization 1 Refined: Globally disable side panel by default.
-// This ensures it never opens automatically on new tabs unless explicitly triggered.
-chrome.runtime.onInstalled.addListener(async () => {
-  try {
-    chrome.sidePanel.setOptions({ enabled: false });
-  } catch (error) {
-    // Ignore if side panel is not available.
+function disableSidePanelByDefault(errorMessage) {
+  if (typeof chrome.sidePanel?.setOptions !== "function") {
+    return;
   }
+  runAsyncOperation(
+    () => chrome.sidePanel.setOptions({ enabled: false }),
+    errorMessage
+  );
+}
+
+// 全局默认禁用，只在用户主动点击扩展图标后为当前标签页开启。
+chrome.runtime.onInstalled.addListener(() => {
+  disableSidePanelByDefault("Failed to disable side panel after installation:");
 });
 
-// Also ensure it's disabled on startup
-try {
-  chrome.sidePanel.setOptions({ enabled: false });
-} catch (error) {
-  // Ignore if side panel is not available.
-}
+disableSidePanelByDefault("Failed to disable side panel on startup:");

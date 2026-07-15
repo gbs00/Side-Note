@@ -1,8 +1,8 @@
-# Side Note 0.1.1 版本测试报告
+# Side Note 1.0.0 版本测试报告
 
-**测试日期**: 2026-02-04（首轮） / 2026-02-10（复测）  
+**测试日期**: 2026-02-04（首轮） / 2026-02-10（复测） / 2026-07-14（技术修复复测）
 **版本号**: 1.0.0
-**测试人员**: Kimi Code CLI  
+**测试人员**: Kimi Code CLI / Codex
 
 ---
 
@@ -18,95 +18,30 @@
 
 | 测试类型 | 总数 | 通过 | 失败 | 受限 | 通过率 |
 |---------|------|------|------|------|--------|
-| 自动化测试 | 44 | 38 | 0 | 6 | 86.4% |
+| 自动化测试 | 51 | 51 | 0 | 0 | 100% |
 | 人工测试 | 17 | - | - | - | 待执行 |
 
-### 2.0 国际化专项补充（执行日期：2026-02-10）
+> 2026-07-14 的 51/51 结果取代早期 38/44 结果。测试夹具已支持同标签页刷新持久化，默认 `npm test` 已恢复，素材生成任务不计入测试总数。
 
-#### 已执行自动化
+### 2.0 国际化专项（2026-07-14）
 
-1) 命令：`npx playwright test tests/i18n.static.spec.js`  
-结果：**5/5 通过**
-- 中英文 locale key 完整性一致
-- manifest i18n 占位字段完整
-- `sidepanel.js` 使用的 i18n key 均存在
-- 导出协议字段名保持 `url/title/created_at`
-
-2) 命令：`npx playwright test tests/i18n.spec.js -g "manifest 使用 i18n 占位并设置 default_locale"`  
-结果：**1/1 通过**
-- `default_locale=zh_CN`
-- `name/description/action.default_title` 均使用 `__MSG_...__`
-
-3) 命令：`npx playwright test tests/i18n.spec.js`  
-结果：**1 通过，3 失败**
-- 失败原因：当前环境缺少 Playwright Chromium 可执行文件（`Executable doesn't exist ... chrome-headless-shell`）
-- 结论：UI 级 i18n E2E 用例本身未发现断言错误，阻塞点为浏览器运行依赖
-
-#### 当前仍需人工/真实环境验证
-
-1. **真实 Chrome 扩展容器验证**
-   - `chrome.sidePanel` 打开/关闭行为
-   - 扩展上下文中的 `chrome.i18n` 真值返回（非 mock）
-
-2. **系统语言联动验证（真实浏览器 profile）**
-   - 将 Chrome 默认语言切换为中文/英文后重启浏览器
-   - 验证 Side Note 文案随默认语言切换
-
-3. **默认 `npm test` 链路依赖受限**
-   - 当前环境仍无法下载 Playwright Chromium（`cdn.playwright.dev` / `npmmirror.com` DNS 不可达）
-   - 页面级 i18n 与核心交互已通过 `agent-browser` 替代链路完成自动化复测
-
-#### 2026-02-10 Agent-Browser 自动化复测（补充）
-
-**测试时间**: 2026-02-10 17:35:00 - 17:42:00 CST  
-**执行方式**: MCP `agent-browser` + 本地临时 HTTP 服务（`http://127.0.0.1:4173`）  
-**测试环境**:
-- 操作系统: macOS 15.6.1 (24G90)
-- Node.js: v24.13.0
-- npm: 11.6.2
-- 浏览器 UA: `Mozilla/5.0 ... Chrome/144.0.0.0 Safari/537.36`
-
-**复测结果**:
-1) 多语言核心脚本（等价覆盖 `tests/i18n.spec.js` 关键断言）  
-结果：**16/16 通过**
-- 中文文案：主题、复制、关闭、空态标题、空态描述
-- 英文文案：主题、复制、关闭、空态标题、空态描述、`html lang=en-US`
-- 导出协议字段：`url/title/created_at`
-
-2) 交互冒烟脚本  
-结果：**4/4 通过**
-- 主题切换生效
-- Markdown 一级标题渲染生效
-- 复制 Toast 可见
-- 复制内容包含协议字段
-
-> 说明：本轮为页面级自动化复测，已覆盖多语言上线关键路径；未覆盖真实扩展容器行为（`chrome.sidePanel` 生命周期）。
+- `i18n.static.spec.js`：5/5 通过。
+- `i18n.spec.js`：4/4 通过。
+- 已覆盖中英文 locale key、manifest 占位、运行时 UI 文案和固定导出字段 `url/title/created_at`。
+- 系统默认语言切换后的真实扩展容器表现仍保留为发布前人工冒烟项。
 
 ### 2.1 自动化测试详细结果
 
-#### ✅ 通过测试 (38/44)
+#### ✅ 通过测试（51/51）
 
-| 模块 | 通过数量 | 测试项 |
+| 测试文件 | 通过数量 | 测试项 |
 |------|---------|--------|
-| TC-2 Markdown 渲染 | 9 | 标题、列表、引用、加粗、斜体、代码、链接 |
-| TC-3 主题切换 | 3 | 按钮存在、点击切换、类名变化 |
-| TC-4 UI/UX 改进 | 7 | 空状态、引用块样式、SVG 图标、Meta 区域结构、主题类名 |
-| TC-5 复制导出 | 4 | 按钮存在、Toast 显示、导出格式、自动隐藏 |
-| TC-6 异常边界 | 1 | 元信息正确加载 |
-| TC-7 性能稳定性 | 3 | 输入防抖、大量 Markdown、列表嵌套 |
+| `i18n.spec.js` | 4 | manifest、中文/英文文案、导出字段 |
+| `i18n.static.spec.js` | 5 | locale 与源码静态一致性 |
+| `sidepanel.spec.js` | 18 | Markdown、主题、复制、元信息与稳定性基线 |
+| `sidepanel_v1.0.0.spec.js` | 24 | 持久化、关闭前落盘、tabId、列表与存储同步 |
 
-#### ⚠️ 受限测试 (6/44)
-
-| 用例ID | 说明 |
-|--------|------|
-| TC-1.1.1 | test-harness 限制：页面重载时 mock storage 重置 |
-| TC-1.4.1 | test-harness 限制：无法模拟真实 Chrome sidePanel 关闭/重开 |
-| TC-1.2.1 | test-harness 限制：跨 Tab 存储隔离需真实 Chrome 环境 |
-| TC-6.1.3 | test-harness 限制：元信息编辑未持久化到 session |
-| TC-6.1.4 | test-harness 限制：页面重载时数据重置 |
-| TC-8.1 | test-harness 限制：storage.onChanged 需真实 Chrome 环境 |
-
-> **注**: 受限测试项已在 test-harness 允许的范围内进行了模拟验证，真实功能需在 Chrome 扩展环境中人工验证。
+真实 Chrome 扩展容器中的标签页/窗口生命周期仍按人工清单执行，不计为自动化失败。
 
 ---
 
@@ -150,8 +85,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 ### 4.1 新增测试脚本
 
-**文件**: `tests/sidepanel_v0.1.1.spec.js`  
-**测试数量**: 20 条新测试用例  
+**目录**: `tests-auto/`
+**测试数量**: 51 条自动化测试
 **测试框架**: Playwright + test-harness.html
 
 ### 4.2 测试执行命令
@@ -164,7 +99,7 @@ npm install
 npm test
 
 # 仅运行新版本测试
-npx playwright test tests/sidepanel_v0.1.1.spec.js
+npx playwright test tests-auto/sidepanel_v1.0.0.spec.js
 
 # 可视化调试
 npm run test:ui
@@ -222,7 +157,7 @@ npm run test:ui
 
 | 问题 | 说明 | 建议 |
 |------|------|------|
-| test-harness 限制 | 部分测试在 mock 环境下受限 | 已在真实环境人工验证清单中覆盖 |
+| 真实扩展生命周期 | 页面级自动化无法完全替代真实 Chrome 标签页/窗口行为 | 发布前执行人工冒烟清单 |
 
 ---
 
@@ -252,8 +187,8 @@ npm run test:ui
 
 **建议发布** ✅
 
-- 自动化测试通过率 86.4%（38/44）
-- 受限测试均为环境限制，核心功能已验证
+- 自动化测试通过率 100%（51/51）
+- 默认测试入口、刷新持久化夹具和存储同步均已修复
 - 无严重 Bug
 
 ### 7.3 后续建议
@@ -266,22 +201,22 @@ npm run test:ui
 
 ## 8. 测试环境（本次复测）
 
-- **测试时间**: 2026-02-10 17:35:00 - 17:42:00 CST
-- **执行环境**: Codex Desktop + MCP agent-browser
-- **页面入口**: `http://127.0.0.1:4173/tests/test-harness.html`
-- **操作系统**: macOS 15.6.1 (24G90)
+- **测试时间**: 2026-07-14
+- **执行环境**: Codex Desktop + Playwright Chromium
+- **页面入口**: `tests-auto/test-harness.html`
+- **操作系统**: macOS
 - **Node.js / npm**: v24.13.0 / 11.6.2
-- **浏览器标识**: Chrome/144.0.0.0 (来自 agent-browser `navigator.userAgent`)
+- **浏览器标识**: Playwright Chromium 145.0.7632.6
 
 ---
 
 ## 9. 附件
 
-1. `TestPlan_v0.1.1.md` - 完整测试计划
-2. `tests/sidepanel_v0.1.1.spec.js` - 自动化测试脚本
+1. `TestPlan_v1.0.0.md` - 完整测试计划
+2. `tests-auto/` - 自动化测试脚本
 3. `test-results/` - 测试运行截图和日志
 
 ---
 
-**报告生成时间**: 2026-02-10 17:43:41 CST  
+**报告更新时间**: 2026-07-14
 **报告状态**: 完成

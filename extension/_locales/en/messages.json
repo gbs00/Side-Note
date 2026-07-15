@@ -66,5 +66,9 @@
   "toast_copy_error": {
     "message": "Copy failed, please try again",
     "description": "Copy failed toast"
+  },
+  "toast_save_error": {
+    "message": "Save failed. Please retry before closing",
+    "description": "Save failure toast shown before closing the panel"
   }
 }

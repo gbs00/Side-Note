@@ -28,7 +28,6 @@ import {
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, indentOnInput, syntaxTree } from "@codemirror/language";
 import { markdown, markdownKeymap } from "@codemirror/lang-markdown";
-import { languages } from "@codemirror/language-data";
 
 function getI18nMessage(key, fallback) {
   try {
@@ -63,7 +62,8 @@ const I18N_TEXT = {
   emptyDesc: getI18nMessage("ui_empty_desc", "在右侧开始记录你的灵感"),
   emptyFallback: getI18nMessage("msg_empty_fallback", "未获取到哦，可手动输入"),
   copySuccess: getI18nMessage("toast_copy_success", "复制完成啦"),
-  copyError: getI18nMessage("toast_copy_error", "复制失败咯，请重试")
+  copyError: getI18nMessage("toast_copy_error", "复制失败咯，请重试"),
+  saveError: getI18nMessage("toast_save_error", "保存失败，请重试后再关闭")
 };
 
 const NOTE_PREFIX = "note:";
@@ -90,11 +90,15 @@ const elements = {
 const state = {
   tabId: null,
   note: null,
-  themePreference: "auto"
+  themePreference: "auto",
+  localRevision: 0,
+  persistedRevision: 0
 };
 
 let editorView = null;
 let toastTimer = null;
+let isApplyingExternalNote = false;
+let storageListenerBound = false;
 
 const editorSetup = [
   EditorView.theme({
@@ -444,43 +448,27 @@ function buildMarkdownDecorations(view) {
   // 记录已装饰的范围，避免嵌套语法重复装饰
   const decoratedRanges = [];
 
-  /**
-   * 列表位置追踪器（Obsidian 风格）
-   * 
-   * 结构：{ nestingLevel: { ordered: count, unordered: count } }
-   * - 每个嵌套级别分别追踪有序和无序列表的计数
-   * - 当进入更深层级时，新层级从 1 开始
-   * - 当返回上层时，下层计数器被重置
-   */
+  // 以实际列表容器为边界计数，避免多个独立列表串号。
   const listCounters = new Map();
-  let lastListLevel = -1;
 
   /**
    * 获取并递增列表位置
-   * @param {number} level - 嵌套级别
+   * @param {SyntaxNodeRef} node - 当前 ListMark 节点
    * @param {boolean} isOrdered - 是否为有序列表
+   * @param {number} level - 嵌套级别（仅用于无父节点时的降级键）
    * @returns {number} 当前位置（从1开始）
    */
-  const getListPosition = (level, isOrdered) => {
-    // 如果嵌套级别变浅，重置所有更深层级的计数器
-    if (level < lastListLevel) {
-      for (const [l] of listCounters) {
-        if (l > level) {
-          listCounters.delete(l);
-        }
-      }
+  const getListPosition = (node, isOrdered, level) => {
+    let container = node.node?.parent || null;
+    while (container && container.name !== "OrderedList" && container.name !== "BulletList") {
+      container = container.parent;
     }
-    lastListLevel = level;
-
-    // 获取或创建该级别的计数器
-    if (!listCounters.has(level)) {
-      listCounters.set(level, { ordered: 0, unordered: 0 });
-    }
-
-    const counter = listCounters.get(level);
-    const key = isOrdered ? "ordered" : "unordered";
-    counter[key] += 1;
-    return counter[key];
+    const key = container
+      ? `${container.name}:${container.from}:${container.to}`
+      : `${isOrdered ? "ordered" : "bullet"}:${level}`;
+    const nextPosition = (listCounters.get(key) || 0) + 1;
+    listCounters.set(key, nextPosition);
+    return nextPosition;
   };
 
   /**
@@ -538,7 +526,7 @@ function buildMarkdownDecorations(view) {
           const isOrdered = /^\d+[.)]?$/.test(markerText.trim());
 
           // 获取该列表项在其嵌套级别内的位置（Obsidian 风格）
-          const position = getListPosition(nestingLevel, isOrdered);
+          const position = getListPosition(node, isOrdered, nestingLevel);
 
           const widget = new ListMarkerWidget(normalizeListMarker(markerText, nestingLevel, position), width);
           decorations.push(Decoration.replace({ widget }).range(node.from, replaceTo));
@@ -766,12 +754,40 @@ function formatDateTime(date) {
 
 function debounce(fn, delay) {
   let timer = null;
-  return (...args) => {
+  let latestArgs = [];
+  let inFlight = Promise.resolve();
+
+  const invoke = () => {
+    timer = null;
+    const args = latestArgs;
+    latestArgs = [];
+    // 上一次写入失败不应永久阻断后续保存；本次 Promise 仍保留拒绝状态供 flush 传播。
+    inFlight = inFlight.catch(() => undefined).then(() => fn(...args));
+    return inFlight;
+  };
+
+  const debounced = (...args) => {
+    latestArgs = args;
     if (timer) {
       clearTimeout(timer);
     }
-    timer = setTimeout(() => fn(...args), delay);
+    timer = setTimeout(() => {
+      // 自动保存没有直接调用方，先记录失败；关闭时 flush 会向用户显示错误。
+      void invoke().catch((error) => {
+        console.warn("Failed to persist note automatically:", error);
+      });
+    }, delay);
   };
+
+  debounced.flush = () => {
+    if (!timer) {
+      return inFlight;
+    }
+    clearTimeout(timer);
+    return Promise.resolve(invoke());
+  };
+
+  return debounced;
 }
 
 function applyI18n() {
@@ -902,6 +918,11 @@ async function loadNote() {
     }
   }
 
+  // 读取期间如果预先注册的 storage 监听器已经收到真实数据，不得再用占位符覆盖。
+  if (state.note) {
+    return;
+  }
+
   // 重试后仍未获取到，创建本地占位符
   // 不写入 storage，让 background.js 作为 url/title/createdAt 的数据源
   // 当 background.js 写入后，storage.onChanged 会自动更新 UI
@@ -962,14 +983,21 @@ const persistNote = debounce(async () => {
   if (!state.note || !Number.isInteger(state.tabId)) {
     return;
   }
-  state.note.updatedAt = formatDateTime(new Date());
+  const revision = state.localRevision;
+  const updatedAt = formatDateTime(new Date());
+  state.note.updatedAt = updatedAt;
+  const noteToPersist = { ...state.note, updatedAt };
   const key = getNoteKey(state.tabId);
-  try {
-    await chrome.storage.session.set({ [key]: state.note });
-  } catch (error) {
-    console.warn("Failed to persist note:", error);
+  await chrome.storage.session.set({ [key]: noteToPersist });
+  if (state.localRevision === revision) {
+    state.persistedRevision = revision;
   }
 }, 300);
+
+function markNoteChanged() {
+  state.localRevision += 1;
+  persistNote();
+}
 
 function buildExportText() {
   const url = state.note?.url || EMPTY_TEXT;
@@ -1017,13 +1045,22 @@ function showToast(message, type) {
   }, 2000);
 }
 
-function clearEditor() {
+function replaceEditorContent(content) {
   if (!editorView) {
     return;
   }
-  editorView.dispatch({
-    changes: { from: 0, to: editorView.state.doc.length, insert: "" }
-  });
+  const nextContent = content || "";
+  if (editorView.state.doc.toString() === nextContent) {
+    return;
+  }
+  isApplyingExternalNote = true;
+  try {
+    editorView.dispatch({
+      changes: { from: 0, to: editorView.state.doc.length, insert: nextContent }
+    });
+  } finally {
+    isApplyingExternalNote = false;
+  }
 }
 
 function initEditor() {
@@ -1039,7 +1076,9 @@ function initEditor() {
     }
     state.note.contentMd = update.state.doc.toString();
     updateEmptyStateVisibility();
-    persistNote();
+    if (!isApplyingExternalNote) {
+      markNoteChanged();
+    }
   });
 
   const doc = state.note?.contentMd || "";
@@ -1051,7 +1090,7 @@ function initEditor() {
       extensions: [
         editorSetup,
         EditorView.lineWrapping,
-        markdown({ codeLanguages: languages }),
+        markdown(),
         pendingLineField,
         pendingLineEvents,
         headingLinePlugin,
@@ -1064,6 +1103,18 @@ function initEditor() {
   });
 
   updateEmptyStateVisibility();
+}
+
+function setPanelClosing(isClosing) {
+  const panel = document.querySelector(".panel");
+  if (!panel) {
+    return;
+  }
+  panel.inert = isClosing;
+  panel.toggleAttribute("aria-busy", isClosing);
+  if (isClosing && document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
 }
 
 function bindEvents() {
@@ -1082,11 +1133,33 @@ function bindEvents() {
     if (!Number.isInteger(state.tabId)) {
       return;
     }
-    // 口径：关闭面板（X）不清空，数据随 tab/窗口/浏览器关闭统一清理
+    // 口径：关闭面板（X）不清空，数据随 tab/窗口/浏览器关闭统一清理。
+    // 先冻结交互，防止慢存储等待期间再产生新输入；仍通过循环覆盖已排队的变更。
+    setPanelClosing(true);
     try {
-      window.close();
+      while (state.localRevision !== state.persistedRevision) {
+        persistNote();
+        await persistNote.flush();
+      }
     } catch (error) {
-      // Ignore if the panel cannot be closed.
+      console.warn("Failed to persist note before closing:", error);
+      setPanelClosing(false);
+      showToast(I18N_TEXT.saveError, "error");
+      return;
+    }
+
+    try {
+      if (chrome?.sidePanel?.close) {
+        await chrome.sidePanel.close({ tabId: state.tabId });
+      } else {
+        // Chrome 141 以前没有 sidePanel.close，保留旧版降级行为。
+        window.close();
+        // 若降级关闭未生效，不应让面板永久不可交互。
+        setTimeout(() => setPanelClosing(false), 0);
+      }
+    } catch (error) {
+      console.warn("Failed to close side panel:", error);
+      setPanelClosing(false);
     }
   });
 
@@ -1097,7 +1170,7 @@ function bindEvents() {
     state.note.url = elements.metaUrl.value;
     elements.metaUrl.title = elements.metaUrl.value;
     syncMetaRowStates();
-    persistNote();
+    markNoteChanged();
   });
 
   elements.metaTitle.addEventListener("input", () => {
@@ -1107,7 +1180,7 @@ function bindEvents() {
     state.note.title = elements.metaTitle.value;
     elements.metaTitle.title = elements.metaTitle.value;
     syncMetaRowStates();
-    persistNote();
+    markNoteChanged();
   });
 
   elements.metaCreated.addEventListener("input", () => {
@@ -1117,7 +1190,7 @@ function bindEvents() {
     state.note.createdAt = elements.metaCreated.value;
     elements.metaCreated.title = elements.metaCreated.value;
     syncMetaRowStates();
-    persistNote();
+    markNoteChanged();
   });
 
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
@@ -1126,53 +1199,82 @@ function bindEvents() {
     }
   });
 
-  // Listen for storage changes to handle race condition with background.js.
-  // When background.js writes the real url/title, we update the UI reactively.
-  if (!chrome || !chrome.storage || !chrome.storage.onChanged || !chrome.storage.onChanged.addListener) {
-    return;
-  }
-
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "session") {
-      return;
-    }
-    const key = getNoteKey(state.tabId);
-    if (changes[key]?.newValue) {
-      const newNote = changes[key].newValue;
-      // Only update meta fields if they have real values (not our placeholder)
-      // and the user hasn't manually edited them.
-      if (state.note) {
-        let didUpdateMeta = false;
-        if (state.note.url === EMPTY_TEXT && newNote.url && newNote.url !== EMPTY_TEXT) {
-          state.note.url = newNote.url;
-          elements.metaUrl.value = newNote.url;
-          elements.metaUrl.title = newNote.url;
-          didUpdateMeta = true;
-        }
-        if (state.note.title === EMPTY_TEXT && newNote.title && newNote.title !== EMPTY_TEXT) {
-          state.note.title = newNote.title;
-          elements.metaTitle.value = newNote.title;
-          elements.metaTitle.title = newNote.title;
-          didUpdateMeta = true;
-        }
-        if (state.note.createdAt === EMPTY_TEXT && newNote.createdAt && newNote.createdAt !== EMPTY_TEXT) {
-          state.note.createdAt = newNote.createdAt;
-          elements.metaCreated.value = newNote.createdAt;
-          elements.metaCreated.title = newNote.createdAt;
-          didUpdateMeta = true;
-        }
-        if (didUpdateMeta) {
-          syncMetaRowStates();
-        }
-      }
+  const flushPendingNote = () => {
+    void persistNote.flush().catch((error) => {
+      console.warn("Failed to flush note while hiding the panel:", error);
+    });
+  };
+  window.addEventListener("pagehide", flushPendingNote);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      flushPendingNote();
     }
   });
 }
 
+function handleStorageChanged(changes, areaName) {
+  if (areaName !== "session") {
+    return;
+  }
+  const key = getNoteKey(state.tabId);
+  const newNote = changes[key]?.newValue;
+  if (!newNote) {
+    return;
+  }
+
+  const hasPendingLocalChanges = state.localRevision !== state.persistedRevision;
+  if (!state.note || !hasPendingLocalChanges) {
+    state.note = { ...newNote };
+    state.localRevision = 0;
+    state.persistedRevision = 0;
+    renderMeta();
+    replaceEditorContent(newNote.contentMd || "");
+    updateEmptyStateVisibility();
+    return;
+  }
+
+  // 本地仍有未落盘内容时，仅补全初始化阶段的占位元信息，避免覆盖用户输入。
+  let didUpdateMeta = false;
+  if (state.note.url === EMPTY_TEXT && newNote.url && newNote.url !== EMPTY_TEXT) {
+    state.note.url = newNote.url;
+    elements.metaUrl.value = newNote.url;
+    elements.metaUrl.title = newNote.url;
+    didUpdateMeta = true;
+  }
+  if (state.note.title === EMPTY_TEXT && newNote.title && newNote.title !== EMPTY_TEXT) {
+    state.note.title = newNote.title;
+    elements.metaTitle.value = newNote.title;
+    elements.metaTitle.title = newNote.title;
+    didUpdateMeta = true;
+  }
+  if (didUpdateMeta) {
+    syncMetaRowStates();
+  }
+}
+
+function bindStorageSync() {
+  if (
+    storageListenerBound ||
+    !Number.isInteger(state.tabId) ||
+    !chrome?.storage?.onChanged?.addListener
+  ) {
+    return;
+  }
+  chrome.storage.onChanged.addListener(handleStorageChanged);
+  storageListenerBound = true;
+}
+
 function parseTabId() {
   const params = new URLSearchParams(window.location.search);
-  const tabId = Number(params.get("tabId"));
-  if (Number.isInteger(tabId)) {
+  if (!params.has("tabId")) {
+    return null;
+  }
+  const rawTabId = params.get("tabId");
+  if (!/^\d+$/.test(rawTabId || "")) {
+    return null;
+  }
+  const tabId = Number(rawTabId);
+  if (Number.isSafeInteger(tabId) && tabId >= 0) {
     return tabId;
   }
   return null;
@@ -1181,6 +1283,8 @@ function parseTabId() {
 async function init() {
   state.tabId = parseTabId();
   applyI18n();
+  // 必须在任何异步读取之前监听 background 写入，避免最后一次 get 与监听注册之间的空窗。
+  bindStorageSync();
   await loadTheme();
   await loadNote();
   renderMeta();

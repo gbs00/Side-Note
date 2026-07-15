@@ -1,3 +1,40 @@
+## 2026-07-15
+
+### v1.0.1 P0 可靠性与发布补丁
+- 保存失败不再被吞掉：关闭前落盘失败会保持面板打开，显示中英文专用提示，存储恢复后可重试。
+- 保存队列在一次 Promise 失败后可恢复，`pagehide`/页面隐藏阶段不会产生未处理拒绝。
+- `storage.onChanged` 提前注册；后台写入前二次读取并合并同期正文，消除初始化竞态与覆盖窗口。
+- 后台 `setOptions`/`open`/`initNote` 的同步异常与 Promise 拒绝统一收口，同时保持 `sidePanel.open()` 在用户手势中同步发起。
+- Manifest 声明最低 Chrome 116，与 Side Panel `open()` 能力边界一致。
+- `npm test` 强制测试前构建；新增真实 unpacked Chromium 冒烟、干净重建 ZIP、必需文件/禁止文件/版本/SHA-256 发布校验。
+- 发布包固定输出为 `dist/side-note-1.0.1.zip`，不包含 `src`、source map 或 `.DS_Store`。
+
+### 发布验证
+- `npm run release:verify`：通过；页面级自动回归 60/60 通过。
+- 真实 unpacked Chromium 冒烟：5 通过、0 失败、1 跳过；跳过项为 Playwright 无法操作浏览器工具栏外壳。
+- 生产 bundle：664.9KB。
+- 发布 ZIP：11 个文件，237,129 bytes；连续两次生成的 SHA-256 一致。
+- `npm audit --json`：0 个已知漏洞；`git diff --check`：通过。
+- SHA-256：`fdd448494965f87e2974b1bc1ee5d91f3d7b455a0d604243276fdf5fefe47748`。
+
+## 2026-07-14
+
+### 八项技术缺陷修复
+- 面板关闭：关闭前 flush 待写内容，Chrome 141+ 使用 `chrome.sidePanel.close({ tabId })`，旧版保留降级。
+- 落盘时序：debounce 支持串行写入与 `flush()`，并监听 `pagehide`/页面隐藏。
+- tabId 校验：缺失或非法参数不再被解析为 `0`。
+- 存储同步：无本地待写内容时同步完整 note；本地有未保存内容时避免被外部变化覆盖。
+- 测试基线：默认 `npm test` 指向 `tests-auto/`，素材生成改为独立 `npm run test:assets`。
+- 测试夹具：使用同标签页 `sessionStorage` 模拟会话存储，支持刷新、元信息和正文同步回归。
+- 构建治理：统一版本号为 `1.0.0`，恢复 `package-lock.json`，移除会删除源码的 `prepack` 行为。
+- 编辑器与列表：移除完整语言解析器集合，生产 bundle 从约 1.9MB 降至约 665KB；独立有序列表分别从 1 开始。
+
+### 本地验证
+- `npm run build`：通过。
+- `npm run build:prod`：通过，生产 bundle 约 665KB。
+- `npm test -- --reporter=line --workers=1`：51/51 通过。
+- `npm audit --json`：0 个已知漏洞。
+
 ## 2026-02-03
 
 ### 生命周期口径统一：关闭标签页/关闭窗口/退出浏览器即清空
@@ -43,7 +80,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 ```
 
 ### 测试 harness 修正
-- `tests/test-harness.html`
+- `tests-auto/test-harness.html`
   - 增加 `chrome.storage.onChanged` mock，并在 session/local 的 set/remove 时触发，避免 UI 监听报错。
   - 同步更新测试页面 DOM 结构以匹配最新 `sidepanel.html`。
 
@@ -60,8 +97,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 ## 2026-01-26
 
 ### 自动化测试框架
-- 新增 Playwright E2E 测试框架（`tests/sidepanel.spec.js`），18 条用例全部通过。
-- 新增 `tests/test-harness.html` 测试页面，mock Chrome API 支持离线测试。
+- 新增 Playwright E2E 测试框架（`tests-auto/sidepanel.spec.js`），18 条用例全部通过。
+- 新增 `tests-auto/test-harness.html` 测试页面，mock Chrome API 支持离线测试。
 - `package.json` 新增 `test` 和 `test:ui` 脚本，支持命令行和可视化测试。
 
 ### BUG-001 修复：主题未跟随系统深色模式

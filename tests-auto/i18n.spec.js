@@ -84,4 +84,22 @@ test.describe("i18n 运行时文案", () => {
     expect(copied).toContain("title:");
     expect(copied).toContain("created_at:");
   });
+
+  test("英文 locale 的保存失败提示独立于复制提示", async ({ page }) => {
+    await page.goto(harnessUrl("en"));
+    await page.waitForSelector(".cm-editor", { timeout: 10000 });
+    await page.evaluate(() => {
+      chrome.storage.session.set = async () => {
+        throw new Error("simulated storage failure");
+      };
+    });
+
+    await page.locator(".cm-content").click();
+    await page.keyboard.type("unsaved note");
+    await page.locator("#closeBtn").click();
+
+    await expect(page.locator("#toast")).toHaveText("Save failed. Please retry before closing");
+    await expect(page.locator("#toast")).toHaveClass(/visible/);
+    expect(await page.evaluate(() => chrome.sidePanel._closeCalls)).toEqual([]);
+  });
 });

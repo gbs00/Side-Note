@@ -19,8 +19,8 @@
 **English**: The core interface of this extension resides in the browser sidebar. This permission is required to render the note editor and respond to user interactions.
 
 ### 需请求 storage 的理由
-**填写内容**：用于在用户本地浏览器中保存笔记内容（storage.session）和主题偏好设置（storage.local），确保数据在浏览器重启后不丢失，且不上传到任何服务器。
-**English**: Used to save note content (storage.session) and theme preferences (storage.local) locally in the user's browser, ensuring data persistence across restarts without uploading to any servers.
+**填写内容**：用于在用户本地浏览器中保存当前会话的笔记内容（storage.session）和主题偏好设置（storage.local）。笔记会在标签页关闭或浏览器重启后清除，所有数据均不会上传到服务器。
+**English**: Used to store current-session notes (storage.session) and theme preferences (storage.local) in the user's browser. Notes are cleared when the tab is closed or the browser restarts, and no data is uploaded to any server.
 
 ### 需请求 activeTab 的理由
 **填写内容**：当用户打开侧边栏笔记时，需要获取当前活动标签页的 URL 和标题，以便自动填充笔记的来源信息。此数据仅用于在本地笔记中显示，不会被传输。

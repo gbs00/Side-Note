@@ -66,5 +66,9 @@
   "toast_copy_error": {
     "message": "复制失败咯，请重试",
     "description": "复制失败提示"
+  },
+  "toast_save_error": {
+    "message": "保存失败，请重试后再关闭",
+    "description": "关闭面板前保存失败提示"
   }
 }

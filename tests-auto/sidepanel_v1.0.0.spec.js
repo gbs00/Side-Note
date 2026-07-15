@@ -1,5 +1,5 @@
 /**
- * Side Note Extension v0.1.1 E2E Tests
+ * Side Note Extension v1.0.0 E2E Tests
  * 
  * 测试范围：
  * - 数据持久化逻辑（同一 Tab 保持、克隆 Tab 隔离、关闭清理）
@@ -68,6 +68,96 @@ test.describe('TC-1: 数据持久化逻辑', () => {
         // 验证内容仍然存在
         const content = await editor.textContent();
         expect(content).toContain(testContent);
+    });
+
+    test('TC-1.4.2: 点击关闭按钮前立即落盘最后一次输入', async ({ page }) => {
+        const editor = page.locator('.cm-content');
+        const testContent = '关闭前必须立即保存';
+        await editor.click();
+        await page.keyboard.type(testContent);
+
+        // 不等待 300ms debounce，直接关闭面板。
+        await page.locator('#closeBtn').click();
+
+        await expect.poll(async () => {
+            return page.evaluate(async (key) => {
+                const result = await chrome.storage.session.get(key);
+                return result[key]?.contentMd || '';
+            }, `note:${MOCK_TAB_ID}`);
+        }).toBe(testContent);
+
+        const closeCalls = await page.evaluate(() => chrome.sidePanel._closeCalls);
+        expect(closeCalls).toEqual([{ tabId: MOCK_TAB_ID }]);
+    });
+
+    test('TC-1.4.3: 保存失败时保持面板打开并允许重试', async ({ page }) => {
+        await page.evaluate(() => {
+            window._originalSessionSet = chrome.storage.session.set;
+            chrome.storage.session.set = async function() {
+                throw new Error('模拟 session 存储失败');
+            };
+        });
+
+        const testContent = '保存失败时不能关闭';
+        await page.locator('.cm-content').click();
+        await page.keyboard.type(testContent);
+        await page.locator('#closeBtn').click();
+
+        await expect(page.locator('#toast')).toHaveText('保存失败，请重试后再关闭');
+        await expect(page.locator('#toast')).toHaveClass(/visible/);
+        expect(await page.evaluate(() => chrome.sidePanel._closeCalls)).toEqual([]);
+
+        // 恢复存储后再次关闭，应重试脏数据并成功调用关闭 API。
+        await page.evaluate(() => {
+            chrome.storage.session.set = window._originalSessionSet;
+        });
+        await page.locator('#closeBtn').click();
+
+        await expect.poll(() => page.evaluate(() => chrome.sidePanel._closeCalls.length)).toBe(1);
+        const storedContent = await page.evaluate(async (key) => {
+            const result = await chrome.storage.session.get(key);
+            return result[key]?.contentMd;
+        }, `note:${MOCK_TAB_ID}`);
+        expect(storedContent).toBe(testContent);
+    });
+
+    test('TC-1.4.4: 慢存储期间冻结交互并在落盘后关闭', async ({ page }) => {
+        await page.evaluate(() => {
+            window._originalSessionSet = chrome.storage.session.set;
+            window._slowSaveStarted = false;
+            chrome.storage.session.set = function(items) {
+                if (!window._slowSaveStarted) {
+                    window._slowSaveStarted = true;
+                    const session = this;
+                    return new Promise((resolve, reject) => {
+                        window._releaseSlowSave = () => {
+                            window._originalSessionSet.call(session, items).then(resolve, reject);
+                        };
+                    });
+                }
+                return window._originalSessionSet.call(this, items);
+            };
+        });
+
+        const editor = page.locator('.cm-content');
+        await editor.click();
+        await page.keyboard.type('关闭前的完整内容');
+        await page.locator('#closeBtn').click();
+
+        await expect.poll(() => page.evaluate(() => document.querySelector('.panel').inert)).toBe(true);
+        expect(await page.evaluate(() => chrome.sidePanel._closeCalls)).toEqual([]);
+
+        // 关闭流程已开始后，用户键盘输入不得再修改编辑器。
+        await page.keyboard.type('不应被接受');
+        await expect(editor).toHaveText('关闭前的完整内容');
+
+        await page.evaluate(() => window._releaseSlowSave());
+        await expect.poll(() => page.evaluate(() => chrome.sidePanel._closeCalls.length)).toBe(1);
+        const storedContent = await page.evaluate(async (key) => {
+            const result = await chrome.storage.session.get(key);
+            return result[key]?.contentMd;
+        }, `note:${MOCK_TAB_ID}`);
+        expect(storedContent).toBe('关闭前的完整内容');
     });
 
     test('TC-1.2.1: 不同 Tab ID 数据隔离', async ({ page }) => {
@@ -369,6 +459,20 @@ test.describe('TC-6: 异常边界', () => {
         // 验证编辑后的值保持
         await expect(urlInput).toHaveValue('https://custom-url.com/page');
     });
+
+    test('TC-6.1.5: 缺少 tabId 时不会写入 note:0', async ({ page }) => {
+        await page.goto(`file://${TEST_HARNESS_PATH}`);
+        await page.waitForSelector('.cm-editor', { timeout: 10000 });
+        await page.locator('.cm-content').click();
+        await page.keyboard.type('无效 tabId 不应持久化');
+        await page.waitForTimeout(500);
+
+        const phantomNote = await page.evaluate(async () => {
+            const result = await chrome.storage.session.get('note:0');
+            return result['note:0'];
+        });
+        expect(phantomNote).toBeUndefined();
+    });
 });
 
 test.describe('TC-7: 性能与稳定性', () => {
@@ -464,9 +568,27 @@ test.describe('TC-7: 性能与稳定性', () => {
         expect(content).toContain('二级项目');
         expect(content).toContain('三级项目');
     });
+
+    test('TC-7.4: 相互独立的有序列表分别从 1 开始', async ({ page }) => {
+        const editor = page.locator('.cm-content');
+        await editor.click();
+        await page.keyboard.insertText('1. 第一个列表\n\n普通段落\n\n1. 第二个列表');
+
+        const markers = await page.locator('.cm-list-marker').allTextContents();
+        expect(markers.map((marker) => marker.trim())).toEqual(['1.', '1.']);
+    });
 });
 
 test.describe('TC-8: 存储监听与同步', () => {
+    test('TC-8.0: 初始化最后一次读取后的真实元信息不会丢失', async ({ page }) => {
+        await page.goto(`file://${TEST_HARNESS_PATH}?tabId=${MOCK_TAB_ID}&simulateInitRace=1`);
+        await page.waitForSelector('.cm-editor', { timeout: 10000 });
+
+        await expect(page.locator('#metaUrl')).toHaveValue('https://www.bilibili.com/video/BV1race');
+        await expect(page.locator('#metaTitle')).toHaveValue('初始化竞态中的真实标题');
+        await expect(page.locator('#metaCreated')).toHaveValue('2026-07-15 09:00:00');
+    });
+
     test('TC-8.1: storage.onChanged 响应外部修改', async ({ page }) => {
         await page.goto(`file://${TEST_HARNESS_PATH}?tabId=${MOCK_TAB_ID}`);
         await page.waitForSelector('.cm-editor', { timeout: 10000 });

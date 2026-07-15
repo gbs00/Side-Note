@@ -2,6 +2,9 @@ node_modules/
 .DS_Store
 dist/
 .env
+playwright-report/
+test-results/
+side-note.zip
 
 # Build artifacts
 extension/sidepanel.js
